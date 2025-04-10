@@ -1,0 +1,26 @@
+{
+  "appId": "com.example.electron-react-ts-demo",
+  "files": [
+    "dist/**/*",
+    "node_modules/**/*"
+  ],
+  "directories": {
+    "buildResources": "resources",
+    "output": "release"
+  },
+  "win": {
+    "target": [
+      "nsis"
+    ]
+  },
+  "mac": {
+    "target": [
+      "dmg"
+    ]
+  },
+  "linux": {
+    "target": [
+      "AppImage"
+    ]
+  }
+}

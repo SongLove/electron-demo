@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Electron React TypeScript Demo</title>
+  <script>
+    // 添加全局变量和polyfill，解决浏览器环境下的兼容性问题
+    window.global = window;
+    window.process = window.process || {
+      env: {
+        NODE_ENV: 'development'
+      }
+    };
+
+    // 添加 EventEmitter 模拟实现
+    window.events = {
+      EventEmitter: function () {
+        this._events = {};
+        this.on = function (event, listener) {
+          if (!this._events[event]) this._events[event] = [];
+          this._events[event].push(listener);
+          return this;
+        };
+        this.emit = function (event, ...args) {
+          if (!this._events[event]) return false;
+          this._events[event].forEach(listener => listener(...args));
+          return true;
+        };
+      }
+    };
+  </script>
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>
