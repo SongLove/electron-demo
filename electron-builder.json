@@ -1,26 +1,36 @@
 {
-  "appId": "com.example.electron-react-ts-demo",
+  "appId": "com.yourapp.id",
+  "asar": true,
+  "compression": "maximum",
   "files": [
     "dist/**/*",
-    "node_modules/**/*"
+    "node_modules/**/*",
+    "package.json"
   ],
   "directories": {
     "buildResources": "resources",
-    "output": "release"
+    "output": "release/${version}"
   },
   "win": {
     "target": [
-      "nsis"
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
     ]
   },
   "mac": {
     "target": [
       "dmg"
-    ]
+    ],
+    "hardenedRuntime": true
   },
   "linux": {
     "target": [
       "AppImage"
-    ]
+    ],
+    "category": "Development"
   }
 }

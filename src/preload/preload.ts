@@ -64,4 +64,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setPreventDisplaySleep: (prevent: boolean) => ipcRenderer.invoke('set-prevent-display-sleep', prevent),
   startPowerMonitoring: () => ipcRenderer.invoke('start-power-monitoring'),
   stopPowerMonitoring: () => ipcRenderer.invoke('stop-power-monitoring'),
+
+  // 添加这两个日志相关的 API
+  getLogs: () => ipcRenderer.invoke('get-logs'),
+  openLogsDirectory: () => ipcRenderer.invoke('open-logs-directory'),
 }); 

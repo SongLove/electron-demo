@@ -6,44 +6,128 @@ import * as url from 'url';
 import * as childProcess from 'child_process';
 import isDev from 'electron-is-dev';
 
+// 检查是否处于生产环境调试模式
+const isDebugProd = process.env.DEBUG_PROD === 'true';
+
 let mainWindow: BrowserWindow | null = null;
 
 // 全局变量，用于存储电源事件监听器
 let powerEventListeners: Array<{ event: string; callback: any }> = [];
 let preventSleepId: number | null = null;
 
-// 创建主窗口
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      nodeIntegration: false, // 出于安全考虑，禁用节点集成
-      contextIsolation: true, // 启用上下文隔离
-      preload: path.join(__dirname, '../preload/preload.js'), // 确认此路径是否正确
-    },
-  });
+// 创建日志文件函数
+function writeLog(message: string) {
+  const logPath = path.join(
+    app.getPath('userData'),
+    'logs',
+    `app-${new Date().toISOString().split('T')[0]}.log`
+  );
 
-  // 加载应用
-  const startUrl = isDev
-    ? 'http://localhost:3000'
-    : url.format({
-      pathname: path.join(__dirname, '../renderer/index.html'),
-      protocol: 'file:',
-      slashes: true,
-    });
-
-  mainWindow.loadURL(startUrl);
-
-  // 打开开发者工具
-  if (isDev) {
-    mainWindow.webContents.openDevTools();
+  // 确保日志目录存在
+  const logDir = path.dirname(logPath);
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
   }
 
-  // 关闭窗口时的处理
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+
+  fs.appendFileSync(logPath, logMessage);
+}
+
+// 创建主窗口
+function createWindow() {
+  try {
+    const windowWidth = 1200;
+    const windowHeight = 800;
+
+    mainWindow = new BrowserWindow({
+      width: windowWidth,
+      height: windowHeight,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, '../preload/preload.js'),
+        devTools: isDev || isDebugProd, // 开发模式或调试模式下启用开发者工具
+      },
+    });
+
+    writeLog('Main window created');
+
+    // 加载应用
+    const startUrl = isDev
+      ? 'http://localhost:3000'
+      : url.format({
+        pathname: path.join(__dirname, '../renderer/index.html'),
+        protocol: 'file:',
+        slashes: true,
+      });
+
+    writeLog(`Loading URL: ${startUrl}`);
+
+    // 添加页面加载事件监听
+    mainWindow.webContents.on('did-fail-load', (_, errorCode, errorDescription) => {
+      writeLog(`Failed to load: ${errorCode} - ${errorDescription}`);
+    });
+
+    mainWindow.webContents.on('did-finish-load', () => {
+      writeLog('Page loaded successfully');
+    });
+
+    mainWindow.webContents.on('render-process-gone', (_, details) => {
+      writeLog(`Render process gone: ${JSON.stringify(details)}`);
+    });
+
+    mainWindow.webContents.on('crashed', () => {
+      writeLog('Renderer process crashed');
+    });
+
+    // 加载URL
+    mainWindow.loadURL(startUrl).catch(err => {
+      writeLog(`Error loading URL: ${err.message}`);
+    });
+
+    // 添加全局异常处理
+    process.on('uncaughtException', (error) => {
+      writeLog(`Uncaught Exception: ${error.message}\n${error.stack}`);
+    });
+
+    // 打开开发者工具
+    if (isDev || isDebugProd) {
+      mainWindow.webContents.openDevTools();
+      writeLog('DevTools opened');
+    }
+
+    // 添加键盘快捷键打开开发者工具
+    mainWindow.webContents.on('before-input-event', (_, input) => {
+      // F12 打开开发者工具
+      if (input.key === 'F12') {
+        mainWindow?.webContents.toggleDevTools();
+        writeLog('DevTools toggled via F12');
+      }
+
+      // Ctrl+Shift+I 打开开发者工具
+      if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+        mainWindow?.webContents.toggleDevTools();
+        writeLog('DevTools toggled via Ctrl+Shift+I');
+      }
+
+      // Ctrl+R 刷新页面
+      if (input.control && input.key.toLowerCase() === 'r') {
+        mainWindow?.webContents.reload();
+        writeLog('Page reloaded via Ctrl+R');
+      }
+    });
+
+    // 关闭窗口时的处理
+    mainWindow.on('closed', () => {
+      mainWindow = null;
+      writeLog('Main window closed');
+    });
+
+  } catch (error) {
+    writeLog(`Error creating window: ${error}`);
+  }
 
   // 创建应用菜单
   createMenu();
@@ -88,12 +172,14 @@ function createMenu() {
 
 // 当 Electron 完成初始化时，创建浏览器窗口
 app.whenReady().then(() => {
+  writeLog('App ready, creating window...');
   createWindow();
 
   app.on('activate', () => {
     // 在 macOS 上，当点击 dock 图标并且没有其他窗口打开时，
     // 通常在应用程序中重新创建一个窗口。
     if (BrowserWindow.getAllWindows().length === 0) {
+      writeLog('Activated with no windows, creating new window...');
       createWindow();
     }
   });
@@ -101,9 +187,11 @@ app.whenReady().then(() => {
 
 // 当所有窗口关闭时退出应用
 app.on('window-all-closed', () => {
+  writeLog('All windows closed');
   // 在 macOS 上，应用和它们的菜单栏通常会保持活动
   // 直到用户使用 Cmd + Q 明确退出
   if (process.platform !== 'darwin') {
+    writeLog('Quitting app');
     app.quit();
   }
 });
@@ -751,4 +839,31 @@ ipcMain.handle('stop-power-monitoring', () => {
     console.error('停止电源监听失败:', error);
     return { success: false, message: `停止失败: ${error}` };
   }
+});
+
+// 添加一个 IPC 处理程序，用于获取日志内容
+ipcMain.handle('get-logs', () => {
+  try {
+    const logPath = path.join(
+      app.getPath('userData'),
+      'logs',
+      `app-${new Date().toISOString().split('T')[0]}.log`
+    );
+
+    if (fs.existsSync(logPath)) {
+      return fs.readFileSync(logPath, 'utf-8');
+    }
+    return 'No logs found';
+  } catch (error) {
+    return `Error reading logs: ${error}`;
+  }
+});
+
+// 添加 IPC 处理程序，用于打开日志文件所在目录
+ipcMain.handle('open-logs-directory', () => {
+  const logDir = path.join(app.getPath('userData'), 'logs');
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+  shell.openPath(logDir);
 }); 

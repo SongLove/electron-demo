@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { Layout, Menu, theme, Typography } from 'antd';
 import {
   DesktopOutlined,
@@ -100,6 +100,9 @@ const componentMap = {
   '8': PowerMonitor,
 };
 
+// 使用动态导入替代静态导入
+const DebugPanel = lazy(() => import('./components/DebugPanel/DebugPanel'));
+
 const App: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [selectedKey, setSelectedKey] = useState('1');
@@ -166,6 +169,9 @@ const App: React.FC = () => {
           Electron React TypeScript Demo ©{new Date().getFullYear()} Created with Ant Design
         </Footer>
       </Layout>
+      <Suspense fallback={<div>Loading...</div>}>
+        <DebugPanel />
+      </Suspense>
     </Layout>
   );
 };
